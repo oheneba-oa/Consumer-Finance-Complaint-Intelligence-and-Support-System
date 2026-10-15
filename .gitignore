@@ -1,0 +1,25 @@
+# Raw CFPB dataset - too large for GitHub
+data/raw/
+
+# Local Chroma vector database
+data/chroma_db/
+
+# Python cache
+__pycache__/
+*.py[cod]
+
+# Environment / secrets
+.env
+.venv/
+venv/
+env/
+
+# OS / editor files
+.DS_Store
+Thumbs.db
+.vscode/
+
+# Temporary files
+*.tmp
+*.log
+*~

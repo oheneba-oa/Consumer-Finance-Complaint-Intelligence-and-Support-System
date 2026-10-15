@@ -1,0 +1,11 @@
+prompt,case_id,scenario,product_accuracy,evidence_accuracy,human_review_accuracy,concept_coverage,response_similarity,average_word_count,best_distance,retrieval_accepted
+C_Original_Evidence_Aware,TC01,Response deadline,0.0,1.0,1.0,1.0,0.9863479932149252,50.666666666666664,0.25116223096847534,True
+C_Original_Evidence_Aware,TC02,Incorrect credit report,1.0,1.0,1.0,1.0,0.8861137628555298,76.0,0.4466423988342285,True
+C_Original_Evidence_Aware,TC03,Unrecognized debt,1.0,1.0,1.0,1.0,0.9571880499521891,55.333333333333336,0.36205828189849854,True
+C_Original_Evidence_Aware,TC04,Frozen checking account,1.0,1.0,1.0,1.0,0.94632355372111,44.666666666666664,0.44382762908935547,True
+C_Original_Evidence_Aware,TC05,Out-of-domain complaint,1.0,1.0,1.0,,0.8483077088991801,30.333333333333332,0.5395011901855469,False
+D_Revised_Production,TC01,Response deadline,1.0,1.0,0.0,0.0,0.9128787716229757,43.0,0.25116223096847534,True
+D_Revised_Production,TC02,Incorrect credit report,0.0,1.0,0.0,1.0,0.906078020731608,59.333333333333336,0.4466423988342285,True
+D_Revised_Production,TC03,Unrecognized debt,0.0,1.0,0.0,1.0,0.8405347069104513,53.0,0.36205828189849854,True
+D_Revised_Production,TC04,Frozen checking account,0.0,1.0,0.0,0.6666666666666666,0.8663236101468405,40.333333333333336,0.44382762908935547,True
+D_Revised_Production,TC05,Out-of-domain complaint,1.0,1.0,1.0,,0.7345114151636759,47.333333333333336,0.5395011901855469,False

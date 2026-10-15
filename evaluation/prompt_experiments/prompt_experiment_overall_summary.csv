@@ -1,0 +1,4 @@
+variant,structured_validity_rate,product_accuracy_rate,product_consistency,response_similarity,evidence_flag_accuracy,key_concept_coverage,average_word_count,human_review_consistency
+A_Basic,1.0,0.6,0.9333333333333332,0.9085827112197876,1.0,1.0,56.8,0.9333333333333332
+B_Strict_Grounding,1.0,0.7333333333333333,0.9333333333333332,0.8068281133969626,0.5333333333333333,0.75,34.8,1.0
+C_Evidence_Aware,1.0,0.8,1.0,0.9777929743131001,1.0,1.0,48.06666666666667,1.0

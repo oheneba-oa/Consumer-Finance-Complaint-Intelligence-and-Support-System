@@ -1,0 +1,11 @@
+prompt,case_id,scenario,product_accuracy,evidence_accuracy,human_review_accuracy,concept_coverage,response_similarity,average_word_count
+C_Original,TC01,Response deadline,0.0,1.0,1.0,1.0,0.8550799489021301,43.333333333333336
+C_Original,TC02,Incorrect credit report,1.0,1.0,1.0,1.0,0.8648645679155985,68.33333333333333
+C_Original,TC03,Unrecognized debt,1.0,1.0,1.0,1.0,0.9436467289924622,47.333333333333336
+C_Original,TC04,Frozen checking account,1.0,1.0,1.0,1.0,0.9859632452329,43.0
+C_Original,TC05,Out-of-domain complaint,1.0,1.0,1.0,,0.8355793754259745,36.0
+E_Minimal_Refinement,TC01,Response deadline,1.0,1.0,1.0,0.0,0.9868305524190267,35.0
+E_Minimal_Refinement,TC02,Incorrect credit report,0.0,1.0,0.6666666666666666,1.0,0.8848029573758444,86.66666666666667
+E_Minimal_Refinement,TC03,Unrecognized debt,0.0,1.0,1.0,1.0,0.9420977036158243,66.0
+E_Minimal_Refinement,TC04,Frozen checking account,1.0,1.0,1.0,1.0,0.9410644968350729,32.0
+E_Minimal_Refinement,TC05,Out-of-domain complaint,1.0,1.0,1.0,,0.8459740877151489,35.0

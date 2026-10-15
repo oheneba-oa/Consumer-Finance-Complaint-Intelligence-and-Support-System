@@ -1,0 +1,3 @@
+prompt,product_accuracy,evidence_accuracy,human_review_accuracy,concept_coverage,response_similarity,average_word_count
+C_Original_Evidence_Aware,0.8,1.0,1.0,1.0,0.9248562137285867,51.4
+D_Revised_Production,0.4,1.0,0.2,0.6666666666666666,0.8520653049151103,48.60000000000001
