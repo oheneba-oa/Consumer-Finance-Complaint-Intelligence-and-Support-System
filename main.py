@@ -1,10 +1,12 @@
-import streamlit as st
-from ollama import chat
-from pydantic import BaseModel, ValidationError
+import re
 from typing import Literal
 
-import pandas as pd
 import chromadb
+import pandas as pd
+import streamlit as st
+
+from ollama import chat
+from pydantic import BaseModel, ValidationError
 from sentence_transformers import SentenceTransformer
 
 
@@ -19,7 +21,6 @@ CHROMA_PATH = "data/chroma_db"
 
 NUMBER_OF_RESULTS = 4
 
-# Validated retrieval thresholds
 MAX_TOP_DISTANCE = 0.50
 MAX_CHUNK_DISTANCE = 0.52
 
@@ -115,7 +116,7 @@ should handle the request.
 
 
 # ============================================================
-# FINAL SELECTED SUPPORT PROMPT
+# SUPPORT PROMPT
 # ============================================================
 
 SUPPORT_PROMPT = """
@@ -172,7 +173,7 @@ Return:
 
 
 # ============================================================
-# ADDITIONAL GROUNDING CONSTRAINT
+# GROUNDING CONSTRAINT
 # ============================================================
 
 GROUNDING_CONSTRAINT = """
@@ -214,7 +215,7 @@ presenting a guaranteed remedy.
 
 
 # ============================================================
-# DATA ANALYSIS EXPLANATION PROMPT
+# ANALYTICS EXPLANATION PROMPT
 # ============================================================
 
 ANALYSIS_PROMPT = """
@@ -245,11 +246,12 @@ provided to you.
 
 
 # ============================================================
-# EMBEDDING MODEL
+# LOAD EMBEDDING MODEL
 # ============================================================
 
 @st.cache_resource
 def load_embedding_model():
+
     return SentenceTransformer(
         "all-MiniLM-L6-v2"
     )
@@ -259,11 +261,12 @@ embedding_model = load_embedding_model()
 
 
 # ============================================================
-# CHROMADB COLLECTION
+# LOAD CHROMADB
 # ============================================================
 
 @st.cache_resource
 def load_collection():
+
     client = chromadb.PersistentClient(
         path=CHROMA_PATH
     )
@@ -277,51 +280,90 @@ collection = load_collection()
 
 
 # ============================================================
-# CFPB ANALYTICAL DATA
+# LOAD CFPB DATA
 # ============================================================
 
 @st.cache_data
 def load_cfpb_data():
+
     return {
-        "summary": pd.read_csv(
-            SUMMARY_PATH
-        ),
 
-        "products": pd.read_csv(
-            PRODUCT_PATH
-        ),
+        "summary":
+            pd.read_csv(
+                SUMMARY_PATH
+            ),
 
-        "issues": pd.read_csv(
-            ISSUE_PATH
-        ),
+        "products":
+            pd.read_csv(
+                PRODUCT_PATH
+            ),
 
-        "companies": pd.read_csv(
-            COMPANY_PATH
-        ),
+        "issues":
+            pd.read_csv(
+                ISSUE_PATH
+            ),
 
-        "responses": pd.read_csv(
-            RESPONSE_PATH
-        ),
+        "companies":
+            pd.read_csv(
+                COMPANY_PATH
+            ),
 
-        "channels": pd.read_csv(
-            CHANNEL_PATH
-        ),
+        "responses":
+            pd.read_csv(
+                RESPONSE_PATH
+            ),
 
-        "states": pd.read_csv(
-            STATE_PATH
-        ),
+        "channels":
+            pd.read_csv(
+                CHANNEL_PATH
+            ),
 
-        "months": pd.read_csv(
-            MONTH_PATH
-        ),
+        "states":
+            pd.read_csv(
+                STATE_PATH
+            ),
 
-        "timely_by_product": pd.read_csv(
-            TIMELY_PRODUCT_PATH
-        )
+        "months":
+            pd.read_csv(
+                MONTH_PATH
+            ),
+
+        "timely_by_product":
+            pd.read_csv(
+                TIMELY_PRODUCT_PATH
+            )
     }
 
 
 cfpb_data = load_cfpb_data()
+
+
+# ============================================================
+# TEXT MATCHING HELPER
+# ============================================================
+
+def contains_phrase(
+    text,
+    phrase
+):
+
+    pattern = (
+        r"(?<!\w)"
+        + re.escape(
+            phrase.lower()
+        ).replace(
+            r"\ ",
+            r"\s+"
+        )
+        + r"(?!\w)"
+    )
+
+    return bool(
+        re.search(
+            pattern,
+            text.lower()
+        )
+    )
 
 
 # ============================================================
@@ -402,27 +444,40 @@ PRODUCT_ALIASES = {
 # PRODUCT DETECTION
 # ============================================================
 
-def find_products_in_question(question):
-
-    question_lower = question.lower()
+def find_products_in_question(
+    question
+):
 
     matches = []
 
-    for product, aliases in PRODUCT_ALIASES.items():
+    for (
+        product,
+        aliases
+    ) in PRODUCT_ALIASES.items():
 
         if any(
-            alias in question_lower
+            contains_phrase(
+                question,
+                alias
+            )
             for alias in aliases
         ):
-            matches.append(product)
+
+            matches.append(
+                product
+            )
 
     return matches
 
 
-def find_product_in_question(question):
+def find_product_in_question(
+    question
+):
 
-    matches = find_products_in_question(
-        question
+    matches = (
+        find_products_in_question(
+            question
+        )
     )
 
     if len(matches) == 1:
@@ -432,12 +487,136 @@ def find_product_in_question(question):
 
 
 # ============================================================
-# ANALYTICS INTENT DETECTION
+# MULTI-TURN CONTEXT
 # ============================================================
 
-def has_analysis_intent(question):
+def is_contextual_followup(
+    question
+):
 
-    q = question.lower()
+    q = (
+        question
+        .lower()
+        .strip()
+        .rstrip("?.!")
+    )
+
+    followup_phrases = {
+        "what should i do next",
+        "what do i do next",
+        "what can i do next",
+        "what should i do",
+        "what can i do",
+        "what now",
+        "what are my next steps",
+        "what is the next step",
+        "what's the next step",
+        "how do i proceed",
+        "tell me more",
+        "can you explain further",
+        "what does that mean",
+        "and then"
+    }
+
+    return q in followup_phrases
+
+
+def get_previous_user_message(
+    messages,
+    current_question
+):
+
+    if not messages:
+        return None
+
+    user_messages = [
+
+        str(
+            message.get(
+                "content",
+                ""
+            )
+        ).strip()
+
+        for message in messages
+
+        if (
+            message.get(
+                "role"
+            )
+            == "user"
+            and str(
+                message.get(
+                    "content",
+                    ""
+                )
+            ).strip()
+        )
+    ]
+
+    if not user_messages:
+        return None
+
+    current_clean = (
+        current_question.strip()
+    )
+
+    if (
+        user_messages[-1]
+        == current_clean
+    ):
+
+        if len(
+            user_messages
+        ) >= 2:
+
+            return (
+                user_messages[-2]
+            )
+
+        return None
+
+    return user_messages[-1]
+
+
+def build_contextual_question(
+    question,
+    conversation_history=None
+):
+
+    if conversation_history is None:
+        conversation_history = []
+
+    if not is_contextual_followup(
+        question
+    ):
+        return question
+
+    previous_user_message = (
+        get_previous_user_message(
+            conversation_history,
+            question
+        )
+    )
+
+    if not previous_user_message:
+        return question
+
+    return (
+        f"Previous user message: "
+        f"{previous_user_message}\n"
+        f"Current follow-up: "
+        f"{question}"
+    )
+
+
+# ============================================================
+# ANALYTICS INTENT
+# ============================================================
+
+def has_analysis_intent(
+    question
+):
 
     analysis_terms = [
         "percentage",
@@ -464,64 +643,97 @@ def has_analysis_intent(question):
     ]
 
     return any(
-        term in q
+        contains_phrase(
+            question,
+            term
+        )
         for term in analysis_terms
     )
 
 
-# ============================================================
-# CFPB PROCESS QUESTION DETECTION
-# ============================================================
+def is_clear_data_analysis_question(
+    question
+):
 
-def is_general_process_question(question):
-
-    q = question.lower()
-
-    process_terms = [
-        "cfpb complaint process",
-        "complaint process",
-        "response deadline",
-        "response time",
-        "how long does a company",
-        "how long do companies",
-        "how long to respond",
-        "how long does it take",
-        "complaint handling",
-        "handling complaints",
-        "complaint procedure",
-        "complaint procedures",
-        "what happens after i submit",
-        "what happens after submitting",
-        "after a complaint is submitted",
-        "after submitting a complaint",
-        "when does a company respond"
+    statistical_terms = [
+        "percentage",
+        "percent",
+        "how many",
+        "number of",
+        "total",
+        "count",
+        "average",
+        "mean",
+        "median",
+        "trend",
+        "monthly",
+        "most",
+        "most common",
+        "highest",
+        "lowest",
+        "top",
+        "breakdown",
+        "distribution",
+        "statistics",
+        "compare",
+        "comparison",
+        "response rate",
+        "timely response rate"
     ]
 
-    process_match = any(
-        term in q
-        for term in process_terms
+    dataset_scope_terms = [
+        "cfpb",
+        "dataset",
+        "data",
+        "complaint",
+        "complaints",
+        "financial product",
+        "product",
+        "products",
+        "issue",
+        "issues",
+        "company",
+        "companies",
+        "response",
+        "responses",
+        "submission channel",
+        "channels",
+        "state",
+        "states",
+        "month",
+        "months",
+        "2025"
+    ]
+
+    has_statistical_term = any(
+        contains_phrase(
+            question,
+            term
+        )
+        for term in statistical_terms
     )
 
-    if has_analysis_intent(question):
-        return False
-
-    products = find_products_in_question(
-        question
+    has_dataset_scope = any(
+        contains_phrase(
+            question,
+            term
+        )
+        for term in dataset_scope_terms
     )
 
     return (
-        process_match
-        and len(products) == 0
+        has_statistical_term
+        and has_dataset_scope
     )
 
 
 # ============================================================
-# RESPONSE-DEADLINE QUESTION DETECTION
+# PROCESS / DEADLINE DETECTION
 # ============================================================
 
-def is_response_deadline_question(question):
-
-    q = question.lower()
+def is_response_deadline_question(
+    question
+):
 
     deadline_terms = [
         "how long does a company",
@@ -534,35 +746,170 @@ def is_response_deadline_question(question):
         "how many days do companies"
     ]
 
-    return (
-        any(
-            term in q
-            for term in deadline_terms
+    return any(
+        contains_phrase(
+            question,
+            term
         )
-        and not has_analysis_intent(question)
+        for term in deadline_terms
+    )
+
+
+def is_general_process_question(
+    question
+):
+
+    if is_response_deadline_question(
+        question
+    ):
+        return True
+
+    process_terms = [
+        "cfpb complaint process",
+        "complaint process",
+        "complaint handling",
+        "handling complaints",
+        "complaint procedure",
+        "complaint procedures",
+        "what happens after i submit",
+        "what happens after submitting",
+        "after a complaint is submitted",
+        "after submitting a complaint"
+    ]
+
+    return any(
+        contains_phrase(
+            question,
+            term
+        )
+        for term in process_terms
     )
 
 
 # ============================================================
-# DETERMINISTIC ROUTING SAFEGUARD
+# CLEAR SUPPORT REQUEST DETECTION
+# ============================================================
+
+def is_clear_complaint_support_question(
+    question
+):
+
+    if find_products_in_question(
+        question
+    ):
+        return True
+
+    support_terms = [
+        "what should i do",
+        "what can i do",
+        "what do i do",
+        "what should i do next",
+        "what can i do next",
+        "what kind of complaint",
+        "classify",
+        "classified",
+        "file a complaint",
+        "submit a complaint",
+        "cfpb help",
+        "help me",
+        "recover it",
+        "refund me",
+        "dispute",
+        "debt collector",
+        "frozen",
+        "froze",
+        "cannot access",
+        "can't access",
+        "do not recognize",
+        "don't recognize"
+    ]
+
+    return any(
+        contains_phrase(
+            question,
+            term
+        )
+        for term in support_terms
+    )
+
+
+def is_short_or_unstructured_input(
+    question
+):
+
+    words = re.findall(
+        r"[A-Za-z]+",
+        question
+    )
+
+    return len(words) <= 4
+
+
+# ============================================================
+# DETERMINISTIC ROUTING
 # ============================================================
 
 def deterministic_route_override(
     user_input
 ):
 
+    # 1. CFPB process/deadline questions
     if is_general_process_question(
         user_input
     ):
 
         return RouteDecision(
             route="complaint_support",
+
             reason=(
                 "Deterministic routing safeguard: "
-                "the request asks about a CFPB "
-                "complaint process or response "
-                "deadline rather than a numerical "
-                "dataset calculation."
+                "CFPB complaint-process or "
+                "response-deadline request."
+            )
+        )
+
+    # 2. Clear statistical CFPB requests
+    if is_clear_data_analysis_question(
+        user_input
+    ):
+
+        return RouteDecision(
+            route="data_analysis",
+
+            reason=(
+                "Deterministic routing safeguard: "
+                "clear statistical or aggregate "
+                "CFPB data request."
+            )
+        )
+
+    # 3. Clear complaint/support requests
+    if is_clear_complaint_support_question(
+        user_input
+    ):
+
+        return RouteDecision(
+            route="complaint_support",
+
+            reason=(
+                "Deterministic routing safeguard: "
+                "clear consumer complaint or "
+                "guidance request."
+            )
+        )
+
+    # 4. Very short / invalid / unclear input
+    if is_short_or_unstructured_input(
+        user_input
+    ):
+
+        return RouteDecision(
+            route="complaint_support",
+
+            reason=(
+                "Deterministic safe fallback for "
+                "short or insufficiently structured "
+                "input."
             )
         )
 
@@ -570,33 +917,51 @@ def deterministic_route_override(
 
 
 # ============================================================
-# LLM ROUTER
+# ROUTER
 # ============================================================
 
-def route_request(user_input):
+def route_request(
+    user_input,
+    conversation_history=None
+):
+
+    if conversation_history is None:
+        conversation_history = []
+
+    routing_input = (
+        build_contextual_question(
+            user_input,
+            conversation_history
+        )
+    )
 
     override = (
         deterministic_route_override(
-            user_input
+            routing_input
         )
     )
 
     if override is not None:
         return override
 
-
     response = chat(
         model=MODEL_NAME,
 
         messages=[
             {
-                "role": "system",
-                "content": ROUTER_PROMPT
+                "role":
+                    "system",
+
+                "content":
+                    ROUTER_PROMPT
             },
 
             {
-                "role": "user",
-                "content": user_input
+                "role":
+                    "user",
+
+                "content":
+                    routing_input
             }
         ],
 
@@ -605,7 +970,6 @@ def route_request(user_input):
             .model_json_schema()
         )
     )
-
 
     return (
         RouteDecision
@@ -616,10 +980,12 @@ def route_request(user_input):
 
 
 # ============================================================
-# PRODUCT-AWARE RETRIEVAL QUERY
+# RETRIEVAL QUERY
 # ============================================================
 
-def build_retrieval_query(question):
+def build_retrieval_query(
+    question
+):
 
     detected_products = (
         find_products_in_question(
@@ -627,8 +993,9 @@ def build_retrieval_query(question):
         )
     )
 
-
-    if len(detected_products) == 1:
+    if len(
+        detected_products
+    ) == 1:
 
         product = (
             detected_products[0]
@@ -640,7 +1007,6 @@ def build_retrieval_query(question):
             f"category '{product}'. "
             f"Consumer issue: {question}"
         )
-
 
     if is_general_process_question(
         question
@@ -654,7 +1020,6 @@ def build_retrieval_query(question):
             f"Question: {question}"
         )
 
-
     return question
 
 
@@ -662,14 +1027,15 @@ def build_retrieval_query(question):
 # RAG SEARCH
 # ============================================================
 
-def search_knowledge_base(query):
+def search_knowledge_base(
+    query
+):
 
     retrieval_query = (
         build_retrieval_query(
             query
         )
     )
-
 
     query_embedding = (
         embedding_model
@@ -678,7 +1044,6 @@ def search_knowledge_base(query):
         )
         .tolist()
     )
-
 
     results = collection.query(
         query_embeddings=[
@@ -694,7 +1059,6 @@ def search_knowledge_base(query):
         ]
     )
 
-
     documents = (
         results["documents"][0]
     )
@@ -707,7 +1071,6 @@ def search_knowledge_base(query):
         results["distances"][0]
     )
 
-
     if not distances:
 
         return (
@@ -717,15 +1080,14 @@ def search_knowledge_base(query):
             retrieval_query
         )
 
+    best_distance = (
+        distances[0]
+    )
 
-    best_distance = distances[0]
-
-
-    # --------------------------------------------------------
-    # QUERY-LEVEL RELEVANCE GATE
-    # --------------------------------------------------------
-
-    if best_distance > MAX_TOP_DISTANCE:
+    if (
+        best_distance
+        > MAX_TOP_DISTANCE
+    ):
 
         return (
             "",
@@ -734,29 +1096,28 @@ def search_knowledge_base(query):
             retrieval_query
         )
 
-
     context_parts = []
     sources = []
 
-
-    # --------------------------------------------------------
-    # CHUNK-LEVEL RELEVANCE FILTER
-    # --------------------------------------------------------
-
-    for document, metadata, distance in zip(
+    for (
+        document,
+        metadata,
+        distance
+    ) in zip(
         documents,
         metadatas,
         distances
     ):
 
-        if distance > MAX_CHUNK_DISTANCE:
+        if (
+            distance
+            > MAX_CHUNK_DISTANCE
+        ):
             continue
-
 
         similarity = (
             1 - distance
         )
-
 
         source = metadata.get(
             "source",
@@ -778,7 +1139,6 @@ def search_knowledge_base(query):
             "Unknown"
         )
 
-
         if file_type == "pdf":
 
             source_label = (
@@ -794,7 +1154,6 @@ def search_knowledge_base(query):
                 f"Chunk {chunk}"
             )
 
-
         context_parts.append(
             f"Source: {source}\n"
             f"Page: {page}\n"
@@ -803,11 +1162,9 @@ def search_knowledge_base(query):
             f"{document}"
         )
 
-
         sources.append(
             source_label
         )
-
 
     if not context_parts:
 
@@ -817,7 +1174,6 @@ def search_knowledge_base(query):
             best_distance,
             retrieval_query
         )
-
 
     return (
         "\n\n".join(
@@ -830,7 +1186,7 @@ def search_knowledge_base(query):
 
 
 # ============================================================
-# DETERMINISTIC CFPB RESPONSE-DEADLINE ANSWER
+# DETERMINISTIC DEADLINE RESPONSE
 # ============================================================
 
 def build_response_deadline_assessment():
@@ -864,7 +1220,7 @@ def build_response_deadline_assessment():
 
 
 # ============================================================
-# SAFE NO-EVIDENCE RESPONSE
+# NO-EVIDENCE RESPONSE
 # ============================================================
 
 def build_no_evidence_assessment(
@@ -876,7 +1232,6 @@ def build_no_evidence_assessment(
             user_input
         )
     )
-
 
     if detected_product:
 
@@ -901,7 +1256,6 @@ def build_no_evidence_assessment(
             "to this request."
         )
 
-
     return ComplaintAssessment(
         product=product,
 
@@ -920,7 +1274,7 @@ def build_no_evidence_assessment(
 
 
 # ============================================================
-# UNSUPPORTED LEGAL / EXTERNAL REFERENCES
+# SAFETY CHECKS
 # ============================================================
 
 EXTERNAL_REFERENCE_TERMS = [
@@ -939,36 +1293,6 @@ EXTERNAL_REFERENCE_TERMS = [
     "nclc"
 ]
 
-
-def contains_unsupported_external_reference(
-    recommendation,
-    context
-):
-
-    recommendation_lower = (
-        recommendation.lower()
-    )
-
-    context_lower = (
-        context.lower()
-    )
-
-
-    for term in EXTERNAL_REFERENCE_TERMS:
-
-        if (
-            term in recommendation_lower
-            and term not in context_lower
-        ):
-            return True
-
-
-    return False
-
-
-# ============================================================
-# UNSUPPORTED OUTCOME / REMEDY DETECTION
-# ============================================================
 
 UNSAFE_RECOMMENDATION_PHRASES = [
     "will remove",
@@ -990,24 +1314,6 @@ UNSAFE_RECOMMENDATION_PHRASES = [
 ]
 
 
-def contains_unsupported_outcome(
-    recommendation
-):
-
-    recommendation_lower = (
-        recommendation.lower()
-    )
-
-    return any(
-        phrase in recommendation_lower
-        for phrase in UNSAFE_RECOMMENDATION_PHRASES
-    )
-
-
-# ============================================================
-# SUMMARY ESCALATION DETECTION
-# ============================================================
-
 ESCALATION_TERMS = [
     "harassment",
     "harassing",
@@ -1023,6 +1329,48 @@ ESCALATION_TERMS = [
 ]
 
 
+def contains_unsupported_external_reference(
+    recommendation,
+    context
+):
+
+    recommendation_lower = (
+        recommendation.lower()
+    )
+
+    context_lower = (
+        context.lower()
+    )
+
+    for term in (
+        EXTERNAL_REFERENCE_TERMS
+    ):
+
+        if (
+            term in recommendation_lower
+            and term not in context_lower
+        ):
+
+            return True
+
+    return False
+
+
+def contains_unsupported_outcome(
+    recommendation
+):
+
+    recommendation_lower = (
+        recommendation.lower()
+    )
+
+    return any(
+        phrase in recommendation_lower
+        for phrase
+        in UNSAFE_RECOMMENDATION_PHRASES
+    )
+
+
 def contains_unstated_escalation(
     summary,
     user_input
@@ -1036,21 +1384,22 @@ def contains_unstated_escalation(
         user_input.lower()
     )
 
-
-    for term in ESCALATION_TERMS:
+    for term in (
+        ESCALATION_TERMS
+    ):
 
         if (
             term in summary_lower
             and term not in user_lower
         ):
-            return True
 
+            return True
 
     return False
 
 
 # ============================================================
-# SAFE DETERMINISTIC SUMMARY
+# SAFE SUMMARY
 # ============================================================
 
 def build_safe_summary(
@@ -1060,9 +1409,9 @@ def build_safe_summary(
 
     q = question.lower()
 
-
     if (
-        product == "Debt collection"
+        product
+        == "Debt collection"
         and "debt" in q
         and (
             "do not recognize" in q
@@ -1077,7 +1426,6 @@ def build_safe_summary(
             "not recognize."
         )
 
-
     if (
         product
         == "Credit reporting or other personal consumer reports"
@@ -1090,7 +1438,6 @@ def build_safe_summary(
             "incorrect and that the issue is "
             "affecting your credit score."
         )
-
 
     if (
         product
@@ -1108,15 +1455,12 @@ def build_safe_summary(
             "your funds."
         )
 
-
     if product != "Uncertain":
 
         return (
             f"The request concerns "
-            f"'{product}'. The issue described "
-            f"by the user is: {question}"
+            f"'{product}'."
         )
-
 
     return (
         "The request does not contain enough "
@@ -1139,7 +1483,6 @@ def build_grounded_fallback_action(
         )
     )
 
-
     if is_general_process_question(
         question
     ):
@@ -1151,7 +1494,6 @@ def build_grounded_fallback_action(
             "handling process."
         )
 
-
     if product == "Debt collection":
 
         return (
@@ -1160,9 +1502,8 @@ def build_grounded_fallback_action(
             "information about the debt and keep "
             "records of the collector's communications. "
             "The available evidence does not establish "
-            "that a legal violation occurred."
+            "that unlawful conduct occurred."
         )
-
 
     if (
         product
@@ -1178,8 +1519,10 @@ def build_grounded_fallback_action(
             "does not guarantee a particular outcome."
         )
 
-
-    if product == "Checking or savings account":
+    if (
+        product
+        == "Checking or savings account"
+    ):
 
         return (
             "Contact the bank to understand why the "
@@ -1190,7 +1533,6 @@ def build_grounded_fallback_action(
             "account access is not guaranteed."
         )
 
-
     return (
         "Use the retrieved CFPB evidence as "
         "informational guidance. The available "
@@ -1200,7 +1542,7 @@ def build_grounded_fallback_action(
 
 
 # ============================================================
-# APPLY DETERMINISTIC SAFEGUARDS
+# APPLY SAFEGUARDS
 # ============================================================
 
 def apply_deterministic_safeguards(
@@ -1211,17 +1553,11 @@ def apply_deterministic_safeguards(
 
     assessment.evidence_available = True
 
-
     products = (
         find_products_in_question(
             question
         )
     )
-
-
-    # --------------------------------------------------------
-    # PRODUCT CLASSIFICATION
-    # --------------------------------------------------------
 
     if len(products) == 1:
 
@@ -1229,13 +1565,11 @@ def apply_deterministic_safeguards(
             products[0]
         )
 
-
     elif len(products) > 1:
 
         assessment.product = (
             "Uncertain"
         )
-
 
     elif is_general_process_question(
         question
@@ -1245,17 +1579,11 @@ def apply_deterministic_safeguards(
             "Uncertain"
         )
 
-
-    # --------------------------------------------------------
-    # HUMAN REVIEW POLICY
-    # --------------------------------------------------------
-
     if len(products) > 1:
 
         assessment.human_review_required = (
             True
         )
-
 
     elif (
         assessment.product
@@ -1269,17 +1597,11 @@ def apply_deterministic_safeguards(
             True
         )
 
-
     else:
 
         assessment.human_review_required = (
             False
         )
-
-
-    # --------------------------------------------------------
-    # PREVENT MODEL FROM ESCALATING USER LANGUAGE
-    # --------------------------------------------------------
 
     if contains_unstated_escalation(
         assessment.summary,
@@ -1293,11 +1615,6 @@ def apply_deterministic_safeguards(
             )
         )
 
-
-    # --------------------------------------------------------
-    # PREVENT UNSUPPORTED EXTERNAL REFERRALS
-    # --------------------------------------------------------
-
     unsupported_reference = (
         contains_unsupported_external_reference(
             assessment.recommended_action,
@@ -1305,17 +1622,11 @@ def apply_deterministic_safeguards(
         )
     )
 
-
-    # --------------------------------------------------------
-    # PREVENT OVERPROMISED REMEDIES
-    # --------------------------------------------------------
-
     unsupported_outcome = (
         contains_unsupported_outcome(
             assessment.recommended_action
         )
     )
-
 
     if (
         unsupported_reference
@@ -1328,12 +1639,11 @@ def apply_deterministic_safeguards(
             )
         )
 
-
     return assessment
 
 
 # ============================================================
-# CFPB DATA ANALYSIS TOOL
+# DATA ANALYSIS
 # ============================================================
 
 def analyse_cfpb_data(
@@ -1348,21 +1658,56 @@ def analyse_cfpb_data(
         .iloc[0]
     )
 
-
-    # --------------------------------------------------------
     # TOTAL COMPLAINTS
-    # --------------------------------------------------------
-
     if (
         (
-            "how many" in q
-            or "total" in q
-            or "number of" in q
+            contains_phrase(
+                q,
+                "how many"
+            )
+            or contains_phrase(
+                q,
+                "total"
+            )
+            or contains_phrase(
+                q,
+                "number of"
+            )
         )
-        and "complaint" in q
-        and "company" not in q
-        and "issue" not in q
-        and "product" not in q
+        and (
+            contains_phrase(
+                q,
+                "complaint"
+            )
+            or contains_phrase(
+                q,
+                "complaints"
+            )
+        )
+        and not contains_phrase(
+            q,
+            "company"
+        )
+        and not contains_phrase(
+            q,
+            "issue"
+        )
+        and not contains_phrase(
+            q,
+            "product"
+        )
+        and not contains_phrase(
+            q,
+            "month"
+        )
+        and not contains_phrase(
+            q,
+            "monthly"
+        )
+        and not contains_phrase(
+            q,
+            "trend"
+        )
     ):
 
         total = int(
@@ -1372,32 +1717,49 @@ def analyse_cfpb_data(
         )
 
         return {
-            "supported": True,
+            "supported":
+                True,
 
-            "result": (
-                f"The processed 2025 CFPB "
-                f"Consumer Complaint Database "
-                f"contains {total:,} published "
-                f"complaints."
-            ),
+            "result":
+                (
+                    f"The processed 2025 CFPB "
+                    f"Consumer Complaint Database "
+                    f"contains {total:,} published "
+                    f"complaints."
+                ),
 
-            "table": None
+            "table":
+                None
         }
 
-
-    # --------------------------------------------------------
-    # OVERALL TIMELY RESPONSE RATE
-    # --------------------------------------------------------
-
+    # TIMELY RESPONSE RATE
     if (
-        "timely" in q
-        and "response" in q
-        and (
-            "percent" in q
-            or "percentage" in q
-            or "rate" in q
+        contains_phrase(
+            q,
+            "timely"
         )
-        and "product" not in q
+        and contains_phrase(
+            q,
+            "response"
+        )
+        and (
+            contains_phrase(
+                q,
+                "percent"
+            )
+            or contains_phrase(
+                q,
+                "percentage"
+            )
+            or contains_phrase(
+                q,
+                "rate"
+            )
+        )
+        and not contains_phrase(
+            q,
+            "product"
+        )
     ):
 
         rate = float(
@@ -1418,91 +1780,121 @@ def analyse_cfpb_data(
             ]
         )
 
-
         return {
-            "supported": True,
+            "supported":
+                True,
 
-            "result": (
-                f"{count:,} of {known:,} "
-                f"published 2025 complaints "
-                f"with known response status "
-                f"were marked as receiving a "
-                f"timely response. This equals "
-                f"{rate:.2f}%."
-            ),
+            "result":
+                (
+                    f"{count:,} of {known:,} "
+                    f"published 2025 complaints "
+                    f"with known response status "
+                    f"were marked as receiving a "
+                    f"timely response. This equals "
+                    f"{rate:.2f}%."
+                ),
 
-            "table": None
+            "table":
+                None
         }
 
-
-    # --------------------------------------------------------
-    # MOST COMMON PRODUCT
-    # --------------------------------------------------------
-
+    # TOP PRODUCT
     if (
         (
-            "most" in q
-            or "highest" in q
-            or "top" in q
+            contains_phrase(
+                q,
+                "most"
+            )
+            or contains_phrase(
+                q,
+                "highest"
+            )
+            or contains_phrase(
+                q,
+                "top"
+            )
         )
         and (
-            "product" in q
-            or "financial product" in q
+            contains_phrase(
+                q,
+                "product"
+            )
+            or contains_phrase(
+                q,
+                "financial product"
+            )
         )
     ):
 
         table = (
-            data["products"]
+            data[
+                "products"
+            ]
             .head(10)
             .copy()
         )
 
-        top = table.iloc[0]
-
+        top = (
+            table.iloc[0]
+        )
 
         return {
-            "supported": True,
+            "supported":
+                True,
 
-            "result": (
-                f"The most common financial "
-                f"product in the processed "
-                f"2025 complaint data is "
-                f"'{top['product']}', with "
-                f"{int(top['complaint_count']):,} "
-                f"complaints "
-                f"({top['percentage_of_complaints']:.2f}%)."
-            ),
+            "result":
+                (
+                    f"The most common financial "
+                    f"product in the processed "
+                    f"2025 complaint data is "
+                    f"'{top['product']}', with "
+                    f"{int(top['complaint_count']):,} "
+                    f"complaints "
+                    f"({top['percentage_of_complaints']:.2f}%)."
+                ),
 
-            "table": table
+            "table":
+                table
         }
 
-
-    # --------------------------------------------------------
     # PRODUCT BREAKDOWN
-    # --------------------------------------------------------
-
     if (
-        "product" in q
+        contains_phrase(
+            q,
+            "product"
+        )
         and (
-            "breakdown" in q
-            or "distribution" in q
-            or "all products" in q
+            contains_phrase(
+                q,
+                "breakdown"
+            )
+            or contains_phrase(
+                q,
+                "distribution"
+            )
+            or contains_phrase(
+                q,
+                "all products"
+            )
         )
     ):
 
         return {
-            "supported": True,
+            "supported":
+                True,
 
-            "result": (
-                "The table below shows complaint "
-                "volume and percentage by CFPB "
-                "financial product."
-            ),
+            "result":
+                (
+                    "The table below shows complaint "
+                    "volume and percentage by CFPB "
+                    "financial product."
+                ),
 
             "table":
-                data["products"].copy()
+                data[
+                    "products"
+                ].copy()
         }
-
 
     detected_product = (
         find_product_in_question(
@@ -1510,250 +1902,364 @@ def analyse_cfpb_data(
         )
     )
 
-
-    # --------------------------------------------------------
     # SPECIFIC PRODUCT COUNT
-    # --------------------------------------------------------
-
     if (
         detected_product
         and (
-            "how many" in q
-            or "number" in q
-            or "count" in q
-            or "complaints" in q
+            contains_phrase(
+                q,
+                "how many"
+            )
+            or contains_phrase(
+                q,
+                "number"
+            )
+            or contains_phrase(
+                q,
+                "count"
+            )
+            or contains_phrase(
+                q,
+                "complaints"
+            )
         )
     ):
 
         matches = (
-            data["products"][
-                data["products"]["product"]
+            data[
+                "products"
+            ][
+                data[
+                    "products"
+                ][
+                    "product"
+                ]
                 == detected_product
             ]
         )
 
-
         if not matches.empty:
 
-            row = matches.iloc[0]
+            row = (
+                matches.iloc[0]
+            )
 
             return {
-                "supported": True,
+                "supported":
+                    True,
 
-                "result": (
-                    f"'{detected_product}' "
-                    f"accounts for "
-                    f"{int(row['complaint_count']):,} "
-                    f"published complaints in "
-                    f"the processed 2025 data, "
-                    f"representing "
-                    f"{row['percentage_of_complaints']:.2f}% "
-                    f"of complaints."
-                ),
+                "result":
+                    (
+                        f"'{detected_product}' "
+                        f"accounts for "
+                        f"{int(row['complaint_count']):,} "
+                        f"published complaints in "
+                        f"the processed 2025 data, "
+                        f"representing "
+                        f"{row['percentage_of_complaints']:.2f}% "
+                        f"of complaints."
+                    ),
 
-                "table": matches
+                "table":
+                    matches
             }
 
-
-    # --------------------------------------------------------
     # TOP ISSUES
-    # --------------------------------------------------------
-
     if (
         (
-            "issue" in q
-            or "problem" in q
+            contains_phrase(
+                q,
+                "issue"
+            )
+            or contains_phrase(
+                q,
+                "problem"
+            )
         )
         and (
-            "most common" in q
-            or "top" in q
-            or "highest" in q
+            contains_phrase(
+                q,
+                "most common"
+            )
+            or contains_phrase(
+                q,
+                "top"
+            )
+            or contains_phrase(
+                q,
+                "highest"
+            )
         )
     ):
 
         table = (
-            data["issues"]
+            data[
+                "issues"
+            ]
             .head(10)
             .copy()
         )
 
-        top = table.iloc[0]
-
-
-        return {
-            "supported": True,
-
-            "result": (
-                f"The most common issue in "
-                f"the processed 2025 data is "
-                f"'{top['issue']}', with "
-                f"{int(top['complaint_count']):,} "
-                f"complaints."
-            ),
-
-            "table": table
-        }
-
-
-    # --------------------------------------------------------
-    # TOP COMPANIES
-    # --------------------------------------------------------
-
-    if (
-        "compan" in q
-        and (
-            "most complaints" in q
-            or "top" in q
-            or "highest" in q
-        )
-    ):
-
-        table = (
-            data["companies"]
-            .head(10)
-            .copy()
+        top = (
+            table.iloc[0]
         )
 
-        top = table.iloc[0]
-
-
         return {
-            "supported": True,
+            "supported":
+                True,
 
-            "result": (
-                f"The company with the highest "
-                f"number of published complaints "
-                f"in the processed 2025 data is "
-                f"'{top['company']}', with "
-                f"{int(top['complaint_count']):,} "
-                f"complaints."
-            ),
-
-            "table": table
-        }
-
-
-    # --------------------------------------------------------
-    # RESPONSE BREAKDOWN
-    # --------------------------------------------------------
-
-    if (
-        "response" in q
-        and (
-            "category" in q
-            or "breakdown" in q
-            or "type" in q
-        )
-        and "timely" not in q
-    ):
-
-        return {
-            "supported": True,
-
-            "result": (
-                "The table below shows how "
-                "companies responded to published "
-                "2025 complaints."
-            ),
+            "result":
+                (
+                    f"The most common issue in "
+                    f"the processed 2025 data is "
+                    f"'{top['issue']}', with "
+                    f"{int(top['complaint_count']):,} "
+                    f"complaints."
+                ),
 
             "table":
-                data["responses"].copy()
+                table
         }
 
-
-    # --------------------------------------------------------
-    # SUBMISSION CHANNEL
-    # --------------------------------------------------------
-
+    # TOP COMPANIES
     if (
         (
-            "channel" in q
-            or "submitted via" in q
-            or "submission" in q
+            contains_phrase(
+                q,
+                "company"
+            )
+            or contains_phrase(
+                q,
+                "companies"
+            )
         )
         and (
-            "most" in q
-            or "top" in q
-            or "breakdown" in q
-            or "common" in q
+            contains_phrase(
+                q,
+                "most complaints"
+            )
+            or contains_phrase(
+                q,
+                "top"
+            )
+            or contains_phrase(
+                q,
+                "highest"
+            )
         )
     ):
 
         table = (
-            data["channels"]
-            .copy()
-        )
-
-        top = table.iloc[0]
-
-
-        return {
-            "supported": True,
-
-            "result": (
-                f"The most common complaint "
-                f"submission channel is "
-                f"'{top['submitted_via']}', "
-                f"with "
-                f"{int(top['complaint_count']):,} "
-                f"complaints."
-            ),
-
-            "table": table
-        }
-
-
-    # --------------------------------------------------------
-    # STATE COUNTS
-    # --------------------------------------------------------
-
-    if (
-        "state" in q
-        and (
-            "most" in q
-            or "highest" in q
-            or "top" in q
-        )
-    ):
-
-        table = (
-            data["states"]
+            data[
+                "companies"
+            ]
             .head(10)
             .copy()
         )
 
-        top = table.iloc[0]
-
+        top = (
+            table.iloc[0]
+        )
 
         return {
-            "supported": True,
+            "supported":
+                True,
 
-            "result": (
-                f"The state with the highest "
-                f"raw number of published "
-                f"complaints in the processed "
-                f"2025 data is "
-                f"'{top['state']}', with "
-                f"{int(top['complaint_count']):,} "
-                f"complaints."
-            ),
+            "result":
+                (
+                    f"The company with the highest "
+                    f"number of published complaints "
+                    f"in the processed 2025 data is "
+                    f"'{top['company']}', with "
+                    f"{int(top['complaint_count']):,} "
+                    f"complaints."
+                ),
 
-            "table": table
+            "table":
+                table
         }
 
-
-    # --------------------------------------------------------
-    # MONTHLY TREND
-    # --------------------------------------------------------
-
+    # RESPONSE BREAKDOWN
     if (
-        "month" in q
-        or "monthly" in q
-        or "trend" in q
+        contains_phrase(
+            q,
+            "response"
+        )
+        and (
+            contains_phrase(
+                q,
+                "category"
+            )
+            or contains_phrase(
+                q,
+                "breakdown"
+            )
+            or contains_phrase(
+                q,
+                "type"
+            )
+        )
+        and not contains_phrase(
+            q,
+            "timely"
+        )
+    ):
+
+        return {
+            "supported":
+                True,
+
+            "result":
+                (
+                    "The table below shows how "
+                    "companies responded to published "
+                    "2025 complaints."
+                ),
+
+            "table":
+                data[
+                    "responses"
+                ].copy()
+        }
+
+    # CHANNEL
+    if (
+        (
+            contains_phrase(
+                q,
+                "channel"
+            )
+            or contains_phrase(
+                q,
+                "submitted via"
+            )
+            or contains_phrase(
+                q,
+                "submission"
+            )
+        )
+        and (
+            contains_phrase(
+                q,
+                "most"
+            )
+            or contains_phrase(
+                q,
+                "top"
+            )
+            or contains_phrase(
+                q,
+                "breakdown"
+            )
+            or contains_phrase(
+                q,
+                "common"
+            )
+        )
     ):
 
         table = (
-            data["months"]
+            data[
+                "channels"
+            ]
+            .copy()
+        )
+
+        top = (
+            table.iloc[0]
+        )
+
+        return {
+            "supported":
+                True,
+
+            "result":
+                (
+                    f"The most common complaint "
+                    f"submission channel is "
+                    f"'{top['submitted_via']}', "
+                    f"with "
+                    f"{int(top['complaint_count']):,} "
+                    f"complaints."
+                ),
+
+            "table":
+                table
+        }
+
+    # STATE
+    if (
+        contains_phrase(
+            q,
+            "state"
+        )
+        and (
+            contains_phrase(
+                q,
+                "most"
+            )
+            or contains_phrase(
+                q,
+                "highest"
+            )
+            or contains_phrase(
+                q,
+                "top"
+            )
+        )
+    ):
+
+        table = (
+            data[
+                "states"
+            ]
+            .head(10)
+            .copy()
+        )
+
+        top = (
+            table.iloc[0]
+        )
+
+        return {
+            "supported":
+                True,
+
+            "result":
+                (
+                    f"The state with the highest "
+                    f"raw number of published "
+                    f"complaints in the processed "
+                    f"2025 data is "
+                    f"'{top['state']}', with "
+                    f"{int(top['complaint_count']):,} "
+                    f"complaints."
+                ),
+
+            "table":
+                table
+        }
+
+    # MONTHLY TREND
+    if (
+        contains_phrase(
+            q,
+            "month"
+        )
+        or contains_phrase(
+            q,
+            "monthly"
+        )
+        or contains_phrase(
+            q,
+            "trend"
+        )
+    ):
+
+        table = (
+            data[
+                "months"
+            ]
             .copy()
         )
 
@@ -1766,31 +2272,35 @@ def analyse_cfpb_data(
             .iloc[0]
         )
 
-
         return {
-            "supported": True,
+            "supported":
+                True,
 
-            "result": (
-                f"The month with the highest "
-                f"number of published complaints "
-                f"in the processed 2025 data was "
-                f"{highest['month']}, with "
-                f"{int(highest['complaint_count']):,} "
-                f"complaints."
-            ),
+            "result":
+                (
+                    f"The month with the highest "
+                    f"number of published complaints "
+                    f"in the processed 2025 data was "
+                    f"{highest['month']}, with "
+                    f"{int(highest['complaint_count']):,} "
+                    f"complaints."
+                ),
 
-            "table": table
+            "table":
+                table
         }
 
-
-    # --------------------------------------------------------
     # TIMELY RESPONSE BY PRODUCT
-    # --------------------------------------------------------
-
     if (
         detected_product
-        and "timely" in q
-        and "response" in q
+        and contains_phrase(
+            q,
+            "timely"
+        )
+        and contains_phrase(
+            q,
+            "response"
+        )
     ):
 
         table = (
@@ -1801,55 +2311,58 @@ def analyse_cfpb_data(
 
         match = (
             table[
-                table["product"]
+                table[
+                    "product"
+                ]
                 == detected_product
             ]
         )
 
-
         if not match.empty:
 
-            row = match.iloc[0]
-
+            row = (
+                match.iloc[0]
+            )
 
             return {
-                "supported": True,
+                "supported":
+                    True,
 
-                "result": (
-                    f"For "
-                    f"'{detected_product}', "
-                    f"{int(row['timely_response_count']):,} "
-                    f"of "
-                    f"{int(row['known_response_count']):,} "
-                    f"complaints with known "
-                    f"response status were marked "
-                    f"timely, giving a rate of "
-                    f"{row['timely_response_rate']:.2f}%."
-                ),
+                "result":
+                    (
+                        f"For "
+                        f"'{detected_product}', "
+                        f"{int(row['timely_response_count']):,} "
+                        f"of "
+                        f"{int(row['known_response_count']):,} "
+                        f"complaints with known "
+                        f"response status were marked "
+                        f"timely, giving a rate of "
+                        f"{row['timely_response_rate']:.2f}%."
+                    ),
 
-                "table": match
+                "table":
+                    match
             }
 
-
-    # --------------------------------------------------------
-    # UNSUPPORTED ANALYSIS
-    # --------------------------------------------------------
-
     return {
-        "supported": False,
+        "supported":
+            False,
 
-        "result": (
-            "The current deterministic CFPB "
-            "analysis tool does not yet support "
-            "that calculation."
-        ),
+        "result":
+            (
+                "The current deterministic CFPB "
+                "analysis tool does not yet support "
+                "that calculation."
+            ),
 
-        "table": None
+        "table":
+            None
     }
 
 
 # ============================================================
-# EXPLAIN DETERMINISTIC ANALYSIS
+# EXPLAIN ANALYSIS
 # ============================================================
 
 def explain_analysis_result(
@@ -1862,23 +2375,27 @@ def explain_analysis_result(
 
         messages=[
             {
-                "role": "system",
-                "content": ANALYSIS_PROMPT
+                "role":
+                    "system",
+
+                "content":
+                    ANALYSIS_PROMPT
             },
 
             {
-                "role": "user",
+                "role":
+                    "user",
 
-                "content": (
-                    f"Question:\n"
-                    f"{question}\n\n"
-                    f"Calculated result:\n"
-                    f"{calculated_result}"
-                )
+                "content":
+                    (
+                        f"Question:\n"
+                        f"{question}\n\n"
+                        f"Calculated result:\n"
+                        f"{calculated_result}"
+                    )
             }
         ]
     )
-
 
     return response.message.content
 
@@ -1900,14 +2417,12 @@ st.title(
     "& Support Assistant"
 )
 
-
 st.write(
     "Ask about the 2025 CFPB Consumer "
     "Complaint Database, the CFPB complaint "
     "process, or describe a financial "
     "consumer complaint."
 )
-
 
 st.caption(
     "The application automatically selects "
@@ -1921,7 +2436,9 @@ st.caption(
 # ============================================================
 
 summary = (
-    cfpb_data["summary"]
+    cfpb_data[
+        "summary"
+    ]
     .iloc[0]
 )
 
@@ -1968,17 +2485,23 @@ with st.expander(
 
 
 # ============================================================
-# DISPLAY CHAT HISTORY
+# DISPLAY HISTORY
 # ============================================================
 
-for message in st.session_state.messages:
+for message in (
+    st.session_state.messages
+):
 
     with st.chat_message(
-        message["role"]
+        message[
+            "role"
+        ]
     ):
 
         st.write(
-            message["content"]
+            message[
+                "content"
+            ]
         )
 
 
@@ -1993,18 +2516,20 @@ user_input = st.chat_input(
 
 
 # ============================================================
-# PROCESS USER REQUEST
+# PROCESS REQUEST
 # ============================================================
 
 if user_input:
 
     st.session_state.messages.append(
         {
-            "role": "user",
-            "content": user_input
+            "role":
+                "user",
+
+            "content":
+                user_input
         }
     )
-
 
     with st.chat_message(
         "user"
@@ -2014,36 +2539,38 @@ if user_input:
             user_input
         )
 
-
     try:
 
-        # ----------------------------------------------------
-        # ROUTING
-        # ----------------------------------------------------
-
         route = route_request(
-            user_input
+            user_input,
+            st.session_state.messages
         )
 
-
         # ====================================================
-        # DATA ANALYSIS ROUTE
+        # DATA ANALYSIS
         # ====================================================
 
-        if route.route == "data_analysis":
+        if (
+            route.route
+            == "data_analysis"
+        ):
 
-            analysis = analyse_cfpb_data(
-                user_input,
-                cfpb_data
+            analysis = (
+                analyse_cfpb_data(
+                    user_input,
+                    cfpb_data
+                )
             )
 
-
-            if analysis["supported"]:
+            if analysis[
+                "supported"
+            ]:
 
                 calculated_result = (
-                    analysis["result"]
+                    analysis[
+                        "result"
+                    ]
                 )
-
 
                 explanation = (
                     explain_analysis_result(
@@ -2052,7 +2579,6 @@ if user_input:
                     )
                 )
 
-
                 stored_response = (
                     f"Calculated Result:\n\n"
                     f"{calculated_result}\n\n"
@@ -2060,14 +2586,15 @@ if user_input:
                     f"{explanation}"
                 )
 
-
                 st.session_state.messages.append(
                     {
-                        "role": "assistant",
-                        "content": stored_response
+                        "role":
+                            "assistant",
+
+                        "content":
+                            stored_response
                     }
                 )
-
 
                 with st.chat_message(
                     "assistant"
@@ -2081,17 +2608,20 @@ if user_input:
                         calculated_result
                     )
 
-
                     if (
-                        analysis["table"]
+                        analysis[
+                            "table"
+                        ]
                         is not None
                     ):
 
                         st.dataframe(
-                            analysis["table"],
+                            analysis[
+                                "table"
+                            ],
+
                             use_container_width=True
                         )
-
 
                     st.markdown(
                         "**AI Explanation**"
@@ -2100,7 +2630,6 @@ if user_input:
                     st.write(
                         explanation
                     )
-
 
                     st.caption(
                         "The numerical result was "
@@ -2111,7 +2640,6 @@ if user_input:
                         "result."
                     )
 
-
                     with st.expander(
                         "View Tool Decision"
                     ):
@@ -2121,14 +2649,16 @@ if user_input:
                         )
 
                         st.write(
-                            f"Reason: {route.reason}"
+                            f"Reason: "
+                            f"{route.reason}"
                         )
-
 
             else:
 
                 response_text = (
-                    analysis["result"]
+                    analysis[
+                        "result"
+                    ]
                     + "\n\n"
                     + "Supported examples include "
                     + "complaint totals, financial "
@@ -2139,14 +2669,15 @@ if user_input:
                     + "response rates."
                 )
 
-
                 st.session_state.messages.append(
                     {
-                        "role": "assistant",
-                        "content": response_text
+                        "role":
+                            "assistant",
+
+                        "content":
+                            response_text
                     }
                 )
-
 
                 with st.chat_message(
                     "assistant"
@@ -2156,12 +2687,18 @@ if user_input:
                         response_text
                     )
 
-
         # ====================================================
-        # CFPB SUPPORT / RAG ROUTE
+        # COMPLAINT SUPPORT / RAG
         # ====================================================
 
         else:
+
+            effective_question = (
+                build_contextual_question(
+                    user_input,
+                    st.session_state.messages
+                )
+            )
 
             (
                 context,
@@ -2169,44 +2706,28 @@ if user_input:
                 best_distance,
                 retrieval_query
             ) = search_knowledge_base(
-                user_input
+                effective_question
             )
-
 
             evidence_available = bool(
                 context
             )
 
-
-            # ------------------------------------------------
-            # NO RELEVANT EVIDENCE
-            # ------------------------------------------------
-
             if not evidence_available:
 
                 assessment = (
                     build_no_evidence_assessment(
-                        user_input
+                        effective_question
                     )
                 )
 
-
-            # ------------------------------------------------
-            # DETERMINISTIC RESPONSE-DEADLINE ANSWER
-            # ------------------------------------------------
-
             elif is_response_deadline_question(
-                user_input
+                effective_question
             ):
 
                 assessment = (
                     build_response_deadline_assessment()
                 )
-
-
-            # ------------------------------------------------
-            # RELEVANT EVIDENCE EXISTS
-            # ------------------------------------------------
 
             else:
 
@@ -2215,40 +2736,45 @@ if user_input:
                     + context
                 )
 
-
                 messages_for_model = [
 
                     {
-                        "role": "system",
-                        "content": SUPPORT_PROMPT
+                        "role":
+                            "system",
+
+                        "content":
+                            SUPPORT_PROMPT
                     },
 
                     {
-                        "role": "system",
-                        "content": GROUNDING_CONSTRAINT
+                        "role":
+                            "system",
+
+                        "content":
+                            GROUNDING_CONSTRAINT
                     },
 
                     {
-                        "role": "system",
-                        "content": retrieval_message
+                        "role":
+                            "system",
+
+                        "content":
+                            retrieval_message
                     }
 
                 ] + st.session_state.messages
 
-
                 response = chat(
                     model=MODEL_NAME,
 
-                    messages=(
-                        messages_for_model
-                    ),
+                    messages=
+                        messages_for_model,
 
                     format=(
                         ComplaintAssessment
                         .model_json_schema()
                     )
                 )
-
 
                 assessment = (
                     ComplaintAssessment
@@ -2257,19 +2783,13 @@ if user_input:
                     )
                 )
 
-
                 assessment = (
                     apply_deterministic_safeguards(
                         assessment,
-                        user_input,
+                        effective_question,
                         context
                     )
                 )
-
-
-            # ------------------------------------------------
-            # FORMAT RESPONSE
-            # ------------------------------------------------
 
             assessment_text = (
                 f"Product: "
@@ -2288,14 +2808,15 @@ if user_input:
                 f"{assessment.human_review_required}"
             )
 
-
             st.session_state.messages.append(
                 {
-                    "role": "assistant",
-                    "content": assessment_text
+                    "role":
+                        "assistant",
+
+                    "content":
+                        assessment_text
                 }
             )
-
 
             with st.chat_message(
                 "assistant"
@@ -2305,24 +2826,17 @@ if user_input:
                     assessment_text
                 )
 
-
-                # --------------------------------------------
-                # RETRIEVED SOURCES
-                # --------------------------------------------
-
                 if sources:
 
                     st.markdown(
                         "**Retrieved CFPB Sources**"
                     )
 
-
                     for source in sources:
 
                         st.write(
                             f"- {source}"
                         )
-
 
                     with st.expander(
                         "View Retrieved Context"
@@ -2331,11 +2845,6 @@ if user_input:
                         st.write(
                             context
                         )
-
-
-                # --------------------------------------------
-                # NO EVIDENCE WARNING
-                # --------------------------------------------
 
                 else:
 
@@ -2349,11 +2858,6 @@ if user_input:
                         "human review."
                     )
 
-
-                # --------------------------------------------
-                # STRUCTURED OUTPUT
-                # --------------------------------------------
-
                 with st.expander(
                     "View Structured Output"
                 ):
@@ -2361,11 +2865,6 @@ if user_input:
                     st.json(
                         assessment.model_dump()
                     )
-
-
-                # --------------------------------------------
-                # TOOL / RETRIEVAL DETAILS
-                # --------------------------------------------
 
                 with st.expander(
                     "View Tool Decision"
@@ -2377,8 +2876,23 @@ if user_input:
                     )
 
                     st.write(
-                        f"Reason: {route.reason}"
+                        f"Reason: "
+                        f"{route.reason}"
                     )
+
+                    if (
+                        effective_question
+                        != user_input
+                    ):
+
+                        st.write(
+                            "Conversation context "
+                            "applied: Yes"
+                        )
+
+                        st.code(
+                            effective_question
+                        )
 
                     st.write(
                         "Retrieval query:"
@@ -2387,7 +2901,6 @@ if user_input:
                     st.code(
                         retrieval_query
                     )
-
 
                     if (
                         best_distance
@@ -2411,11 +2924,6 @@ if user_input:
                             f"{MAX_CHUNK_DISTANCE:.2f}"
                         )
 
-
-    # ========================================================
-    # STRUCTURED OUTPUT ERROR
-    # ========================================================
-
     except ValidationError as error:
 
         st.error(
@@ -2423,7 +2931,6 @@ if user_input:
             "response that failed structured "
             "output validation."
         )
-
 
         with st.expander(
             "Technical details"
@@ -2433,18 +2940,12 @@ if user_input:
                 error
             )
 
-
-    # ========================================================
-    # GENERAL APPLICATION ERROR
-    # ========================================================
-
     except Exception as error:
 
         st.error(
             "An error occurred while "
             "processing the request."
         )
-
 
         with st.expander(
             "Technical details"
