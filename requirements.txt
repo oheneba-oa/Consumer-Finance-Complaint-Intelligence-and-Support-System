@@ -1,0 +1,10 @@
+streamlit
+pandas
+numpy
+pydantic
+chromadb
+sentence-transformers
+pypdf
+requests
+ollama
+python-dotenv
