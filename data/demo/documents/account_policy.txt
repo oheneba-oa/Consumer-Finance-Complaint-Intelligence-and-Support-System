@@ -1,9 +1,0 @@
-Account Support Policy
-
-Customers who cannot access their account should first confirm that they are using the correct registered email address.
-
-Password reset requests should be handled by the Account Support team.
-
-Customers should never be asked to provide their password to a support agent.
-
-If account ownership cannot be verified, the case should be escalated for manual review.
