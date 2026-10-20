@@ -1,2 +1,7 @@
-total_cases,passed_cases,failed_cases,overall_pass_rate,route_accuracy,structured_output_validity
-15,15,0,100.0,100.0,100.0
+metric,value
+Total cases,15.0
+Passed,15.0
+Failed,0.0
+Overall pass rate (%),100.0
+Route accuracy (%),100.0
+Structured output validity (%),100.0
