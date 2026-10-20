@@ -1,0 +1,22 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+
+    container_name: cfpb-consumer-complaint-ai
+
+    ports:
+      - "8501:8501"
+
+    environment:
+      OLLAMA_HOST: http://host.docker.internal:11434
+      HF_TOKEN: ${HF_TOKEN:-}
+
+    volumes:
+      - ./data/chroma_db:/app/data/chroma_db
+
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+    restart: unless-stopped
