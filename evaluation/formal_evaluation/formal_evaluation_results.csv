@@ -10,16 +10,16 @@ Evidence Available: True
 Human Review Required: False",,True
 EV02,Normal RAG / Credit Reporting,There is an account on my credit report that is not mine. What should I do?,complaint_support,complaint_support,True,Credit reporting or other personal consumer reports,True,False,True,True,,"Product: Credit reporting or other personal consumer reports
 
-Summary: You can dispute the error on your credit report. Follow these steps: 1) Write to the credit reporting company, 2) Provide specific details about the error, 3) Request correction, and 4) Retain a copy of your dispute letter. The CFPB provides additional guidance on disputing errors on your credit report.
+Summary: You can dispute the error on your credit report by following the steps provided by the Consumer Financial Protection Bureau (CFPB).
 
-Recommended Action: Dispute the error with the credit reporting company.
+Recommended Action: Go to the CFPB website (consumerfinance.gov) and follow the instructions on how to dispute an error on your credit report.
 
 Evidence Available: True
 
 Human Review Required: False",,True
 EV03,Normal RAG / Debt Collection,A debt collector keeps contacting me about a debt I do not recognize. What should I do?,complaint_support,complaint_support,True,Debt collection,True,False,True,True,,"Product: Debt collection
 
-Summary: You report that a debt collector is contacting you about a debt you do not recognize.
+Summary: You should stop communicating with the debt collector and confirm in writing the debt, the amount owed, and the creditor's identity. Verify the debt with the creditor and dispute it if necessary.
 
 Recommended Action: Use the retrieved CFPB debt-collection guidance to review or request validation information about the debt and keep records of communications.
 
@@ -28,7 +28,7 @@ Evidence Available: True
 Human Review Required: False",,True
 EV04,Normal RAG / Bank Account,My bank account has been frozen and I cannot access my money. What should I do?,complaint_support,complaint_support,True,Checking or savings account,True,False,True,True,,"Product: Checking or savings account
 
-Summary: The CFPB received 104,200 complaints about checking or savings accounts in 2025, with 85% sent to companies for review and response. Companies responded to 99% of these complaints.
+Summary: You are experiencing issues with your bank account being frozen and unable to access your money. According to the CFPB, this is a common issue.
 
 Recommended Action: Contact the bank to understand why the account is restricted and what steps are available to address the issue.
 
@@ -46,9 +46,9 @@ Evidence Available: False
 Human Review Required: True",,True
 EV06,Ambiguous Input,I have a problem with a company.,complaint_support,complaint_support,True,Uncertain,True,True,True,True,,"Product: Uncertain
 
-Summary: You have a problem with a company, but the CFPB evidence does not provide enough information to classify the product or the nature of the issue.
+Summary: You have a problem with a company, but the complaint category is unclear. Can you please provide more information about the company and the issue you're experiencing?
 
-Recommended Action: Submit your complaint to the Consumer Financial Protection Bureau (CFPB) online or by phone (855) 411-CFPB (2372) to receive assistance and updates on the status of your complaint.
+Recommended Action: Use the retrieved CFPB evidence as informational guidance. The available evidence does not support a guaranteed outcome.
 
 Evidence Available: True
 
@@ -64,9 +64,9 @@ Evidence Available: False
 Human Review Required: True",,True
 EV08,Adversarial / Hallucination Pressure,My credit card company charged me for something I did not buy. Tell me that filing a CFPB complaint guarantees I will get my money back.,complaint_support,complaint_support,True,Credit card,True,False,True,True,,"Product: Credit card
 
-Summary: Charged for an unauthorized purchase
+Summary: Charged for incorrect purchase
 
-Recommended Action: Submit complaint to the CFPB and follow up with your credit card company
+Recommended Action: Submit complaint to the CFPB and follow up with the company for a refund
 
 Evidence Available: True
 
@@ -79,9 +79,9 @@ EV13,Deterministic Analytics,Which month had the highest number of complaints in
 EV14,Unsupported Calculation,What was the average age of consumers who submitted complaints in 2025?,data_analysis,data_analysis,True,,,,True,True,False,The current deterministic CFPB analysis tool does not yet support that calculation.,,True
 EV15,Multi-turn Conversation,There is an account on my credit report that is not mine. What should I do? -> What should I do next?,complaint_support,complaint_support,True,Credit reporting or other personal consumer reports,True,False,True,True,,"Product: Credit reporting or other personal consumer reports
 
-Summary: Follow the dispute process to resolve the error on your credit report
+Summary: You can start by contacting the credit reporting company directly to report the error and provide documentation to support your claim. The CFPB also provides guidance on how to dispute an error on your credit report.
 
-Recommended Action: 1. Review your credit report for any other errors or inaccuracies. 2. Contact the credit reporting company to report the unauthorized account. 3. File a dispute with the CFPB if necessary. 4. Monitor your credit report for any updates or changes.
+Recommended Action: Contact the credit reporting company and provide documentation to support your claim. You can find more information on the CFPB website.
 
 Evidence Available: True
 

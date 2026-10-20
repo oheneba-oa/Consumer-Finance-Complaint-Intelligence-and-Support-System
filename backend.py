@@ -221,6 +221,10 @@ Follow these rules:
 
 10. Avoid unnecessary verbosity.
 
+11. Do not generate, invent, modify or append URLs or
+    Markdown links. Only use a URL if it is explicitly
+    supplied by verified application metadata.
+
 Return:
 
 - product
@@ -402,6 +406,60 @@ def contains_phrase(
             text.lower(),
         )
     )
+
+
+
+# ============================================================
+# GENERATED URL SAFEGUARDS
+# ============================================================
+
+URL_PATTERN = re.compile(
+    r"https?://[^\s\]\)}>\"']+",
+    re.IGNORECASE,
+)
+
+MARKDOWN_URL_PATTERN = re.compile(
+    r"\[([^\]]+)\]\(https?://[^\s)]+\)",
+    re.IGNORECASE,
+)
+
+
+def contains_generated_url(text):
+    if not text:
+        return False
+
+    return bool(
+        URL_PATTERN.search(str(text))
+    )
+
+
+def strip_generated_urls(text):
+    if not text:
+        return text
+
+    cleaned = MARKDOWN_URL_PATTERN.sub(
+        r"\1",
+        str(text),
+    )
+
+    cleaned = URL_PATTERN.sub(
+        "",
+        cleaned,
+    )
+
+    cleaned = re.sub(
+        r"\s{2,}",
+        " ",
+        cleaned,
+    )
+
+    cleaned = re.sub(
+        r"\s+([.,;:!?])",
+        r"\1",
+        cleaned,
+    )
+
+    return cleaned.strip()
 
 
 # ============================================================
@@ -1708,6 +1766,32 @@ def apply_deterministic_safeguards(
             )
         )
 
+
+
+    # Prevent the language model from exposing invented or
+    # modified URLs when the application has not supplied a
+    # verified URL.
+    if contains_generated_url(
+        assessment.summary
+    ):
+        assessment.summary = strip_generated_urls(
+            assessment.summary
+        )
+
+        if not assessment.summary:
+            assessment.summary = build_safe_summary(
+                question,
+                assessment.product,
+            )
+
+    if contains_generated_url(
+        assessment.recommended_action
+    ):
+        assessment.recommended_action = (
+            build_grounded_fallback_action(
+                question
+            )
+        )
 
     if contains_unstated_escalation(
         assessment.summary,
