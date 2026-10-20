@@ -2,23 +2,28 @@
 
 ## Project Overview
 
-The CFPB Consumer Complaint Intelligence & Support Assistant is an AI-powered consumer-finance support and analytics application developed for the **DSA5202 – Special Topics in Data Science** final project.
+The CFPB Consumer Complaint Intelligence & Support Assistant is a consumer-finance support and analytics application.
+
+The project addresses two related problems:
+
+1. helping users understand consumer-finance complaints using official Consumer Financial Protection Bureau (CFPB) information; and
+2. helping users explore patterns in millions of published CFPB complaint records.
 
 The system combines:
 
-- Retrieval-Augmented Generation (RAG)
-- Large Language Models
-- Semantic document retrieval
-- Structured CFPB complaint data
-- Deterministic Python analytics
-- Schema validation
-- Multi-turn conversation support
-- Streamlit
-- Docker containerization
+- Retrieval-Augmented Generation (RAG);
+- a locally hosted Large Language Model;
+- semantic document retrieval;
+- structured CFPB complaint data;
+- deterministic Python analytics;
+- schema validation;
+- multi-turn conversation support;
+- Streamlit; and
+- Docker containerization.
 
-The application is designed to help users understand consumer-finance complaints using official Consumer Financial Protection Bureau (CFPB) information while also providing analytical insights into complaint patterns.
+The system deliberately does not use the language model for every task. Natural-language interpretation and explanation are handled by the LLM, while numerical analysis is performed using deterministic Python and Pandas operations.
 
-It is not intended to provide legal, financial or regulatory advice.
+The application is intended as an informational and decision-support tool. It does not provide legal, financial or regulatory advice.
 
 ---
 
@@ -26,15 +31,82 @@ It is not intended to provide legal, financial or regulatory advice.
 
 Consumers frequently experience problems involving financial products such as credit reporting, debt collection, bank accounts, loans and credit cards.
 
-Although the CFPB provides official information and maintains a large public Consumer Complaint Database, users may find it difficult to:
+Although the CFPB provides official information and maintains a large public Consumer Complaint Database, users may still find it difficult to:
 
 - locate relevant guidance;
 - understand complaint procedures;
 - interpret financial complaint terminology;
 - identify patterns in millions of complaint records; and
-- determine what practical steps may be appropriate.
+- determine what practical next step may be appropriate.
 
-The project addresses this problem through an AI system that combines official CFPB guidance with structured complaint analytics.
+The project addresses this problem through a hybrid system that combines official CFPB guidance with structured complaint analytics.
+
+Instead of presenting users with large documents or raw datasets, the application allows them to ask questions in ordinary language and routes each request to the most appropriate processing path.
+
+---
+
+## Intended Users and Why AI Is Appropriate
+
+The system is intended for three main user groups.
+
+**Consumers** can describe a financial complaint in natural language and receive a concise explanation grounded in relevant CFPB information.
+
+**Customer-support, compliance or consumer-relations staff** can use the system to locate relevant guidance more quickly and identify situations that require further review.
+
+**Analysts and researchers** can ask questions about complaint patterns without manually examining millions of individual records.
+
+An AI-assisted approach is appropriate because consumer complaints are often expressed informally, with incomplete terminology or without knowledge of official CFPB product categories.
+
+The language model helps interpret these questions and convert retrieved or computed information into understandable responses.
+
+However, the system does not rely on the LLM for tasks that deterministic software can perform more reliably.
+
+For example:
+
+```text
+Natural-language understanding    → Llama 3.2
+Document discovery                → Semantic retrieval
+Numerical calculations            → Python / Pandas
+Structured-output validity        → Pydantic
+Safety and predictable behaviour  → Deterministic safeguards
+```
+
+This separation improves reliability and makes the system easier to explain and test.
+
+---
+
+## Human Review and Usefulness Criteria
+
+The system is designed to request or recommend human review when:
+
+- relevant CFPB evidence cannot be retrieved;
+- the request is ambiguous, unsupported or outside the system's intended domain;
+- the available evidence is insufficient to support a reliable recommendation; or
+- the situation requires professional legal, financial or regulatory judgement.
+
+The usefulness of the application is evaluated using measurable system behaviour rather than subjective impressions alone.
+
+The formal evaluation checks whether:
+
+- requests are routed to the correct processing path;
+- structured outputs remain valid;
+- evidence is used appropriately;
+- unsupported claims are avoided;
+- analytics results are calculated correctly; and
+- human review is triggered when appropriate.
+
+The final 15-case evaluation achieved:
+
+| Metric | Result |
+|---|---:|
+| Test cases | 15 |
+| Passed | 15 |
+| Failed | 0 |
+| Overall pass rate | 100% |
+| Route accuracy | 100% |
+| Structured output validity | 100% |
+
+These results apply to the project's defined evaluation set and should not be interpreted as a guarantee of perfect performance on every possible real-world query.
 
 ---
 
@@ -49,22 +121,25 @@ Users can describe a consumer-finance problem in natural language.
 The system:
 
 1. interprets the user's request;
-2. retrieves relevant information from official CFPB documents;
-3. classifies the complaint into a CFPB product category;
-4. generates a grounded summary;
-5. provides a practical recommended action;
-6. indicates whether relevant evidence was found; and
-7. flags cases that may require human review.
+2. determines whether the request belongs to the support or analytics workflow;
+3. retrieves relevant information from official CFPB documents;
+4. classifies the complaint into a CFPB product category;
+5. generates a grounded summary;
+6. provides a practical recommended action;
+7. indicates whether supporting evidence was found; and
+8. flags cases that may require human review.
 
 Example:
 
 > There is an account on my credit report that is not mine. What should I do?
 
+The application retrieves relevant CFPB guidance before generating the response rather than relying only on the model's pre-trained knowledge.
+
 ---
 
 ### 2. Complaint Data Analytics
 
-Users can also ask statistical questions about CFPB complaint data.
+Users can ask statistical questions about CFPB complaint data.
 
 Examples include:
 
@@ -76,9 +151,11 @@ Examples include:
 
 > What percentage of complaints received timely responses?
 
-Analytical calculations are performed using deterministic Python and Pandas operations rather than asking the language model to calculate statistics.
+Analytical calculations are performed using deterministic Python and Pandas operations.
 
-The language model is used only to explain the computed result in natural language.
+The language model is not asked to calculate the underlying statistics. It is used only to explain the already-computed result in natural language.
+
+This reduces the risk of numerical hallucination.
 
 ---
 
@@ -107,6 +184,24 @@ The structured statistical analyses use aggregated results derived from the full
 
 The 108,809-record sample is used as a manageable development and inspection subset.
 
+The analysis therefore distinguishes between:
+
+```text
+Full 2025 published CFPB data
+        ↓
+Deterministic aggregation
+        ↓
+Analytical CSV outputs
+```
+
+and:
+
+```text
+108,809-record deterministic sample
+        ↓
+Development and inspection
+```
+
 ---
 
 ## Knowledge Base
@@ -126,9 +221,13 @@ The knowledge base includes CFPB information relating to:
 - suspicious account activity; and
 - the CFPB 2025 Consumer Response Annual Report.
 
-Documents are processed by `build_knowledge_base.py`.
+Documents are processed by:
 
-The pipeline performs:
+```text
+build_knowledge_base.py
+```
+
+The ingestion pipeline performs:
 
 ```text
 PDF documents
@@ -139,6 +238,8 @@ Text cleaning
       ↓
 Chunking
       ↓
+Metadata assignment
+      ↓
 Sentence Transformer embeddings
       ↓
 ChromaDB vector storage
@@ -146,13 +247,15 @@ ChromaDB vector storage
 
 The current knowledge base contains approximately **252 document chunks**.
 
+Metadata such as source document and page information is retained so that retrieved evidence can be traced back to its origin.
+
 ---
 
-## Retrieval-Augmented Generation Architecture
+## Retrieval-Augmented Generation Design
 
 The system uses the `all-MiniLM-L6-v2` Sentence Transformer model for document embeddings.
 
-ChromaDB is used as the vector database.
+ChromaDB is used as the local vector database.
 
 For a consumer-support query:
 
@@ -178,6 +281,20 @@ Final Response
 
 Retrieval thresholds are used to prevent weak or irrelevant evidence from being treated as reliable CFPB guidance.
 
+### Why Retrieval Is Used
+
+Placing every CFPB document directly into every prompt would introduce large amounts of irrelevant information and would make the system harder to scale and control.
+
+Retrieval is preferable because it:
+
+- selects only information relevant to the current question;
+- reduces unnecessary prompt context;
+- makes responses easier to ground in identifiable source material;
+- improves scalability as more documents are added; and
+- allows the system to reject weak retrieval results instead of pretending that supporting evidence exists.
+
+The language model therefore receives only the most relevant retrieved context rather than the entire document collection.
+
 ---
 
 ## System Architecture
@@ -187,15 +304,16 @@ flowchart TD
 
     U[User] --> UI[Streamlit Interface]
 
+    UI --> SS[Session State / Conversation History]
     UI --> B[Backend Router]
 
-    B -->|Support Question| R[RAG Pipeline]
-    B -->|Analytics Question| A[Analytics Engine]
+    B -->|Consumer Support| R[RAG Pipeline]
+    B -->|Data Question| A[Analytics Engine]
 
-    R --> E[Sentence Transformer Embedding]
-    E --> C[ChromaDB]
+    R --> E[Sentence Transformer]
+    E --> C[(ChromaDB)]
     C --> D[Retrieved CFPB Evidence]
-    D --> L[Llama 3.2]
+    D --> L[Llama 3.2 via Ollama]
 
     A --> P[Python / Pandas]
     P --> L
@@ -203,7 +321,39 @@ flowchart TD
     L --> V[Pydantic Validation]
     V --> S[Deterministic Safeguards]
     S --> UI
+
+    UI --> ERR[User-facing Error Handling]
 ```
+
+The architecture uses a controlled routing layer rather than allowing the LLM to perform every operation.
+
+The two main execution paths are:
+
+```text
+Consumer-support question
+        ↓
+Retrieval
+        ↓
+Grounded LLM interpretation
+        ↓
+Validation and safeguards
+```
+
+and:
+
+```text
+Analytics question
+        ↓
+Deterministic Python calculation
+        ↓
+Optional natural-language explanation
+```
+
+Conversation state is maintained in Streamlit session state for the duration of the current user session.
+
+Persistent knowledge is stored in ChromaDB.
+
+The Llama 3.2 model runs through Ollama as an external local service.
 
 ---
 
@@ -281,9 +431,17 @@ Variant C produced the strongest overall performance and was selected as the fin
 
 Additional prompt refinements were tested but did not consistently improve performance.
 
-This showed that adding more prompt instructions did not necessarily improve the local Llama model.
+This demonstrated an important engineering lesson: adding more prompt instructions did not automatically improve the behaviour of the local model.
 
-Consequently, some predictable safety and routing behaviours were moved from prompting into deterministic Python logic.
+Some predictable safety, routing and fallback behaviours were therefore moved from prompting into deterministic Python logic.
+
+The detailed experiment outputs are retained in:
+
+```text
+evaluation/prompt_experiments/
+evaluation/prompt_refinement/
+evaluation/prompt_final/
+```
 
 ---
 
@@ -299,7 +457,9 @@ Consumer-support responses use a structured schema containing fields such as:
 
 Pydantic validates the generated response before it is shown to the user.
 
-This reduces malformed or unpredictable language-model output.
+This provides an explicit contract between the language model and the application.
+
+If model output is malformed or incomplete, the application does not blindly trust it. Validation and application-level error handling prevent invalid structured responses from being treated as normal output.
 
 ---
 
@@ -316,10 +476,19 @@ Examples include:
 - product statistics;
 - query routing;
 - selected complaint classifications;
-- evidence thresholds; and
-- unsupported calculation detection.
+- evidence thresholds;
+- unsupported calculation detection;
+- fallback actions for selected high-risk cases; and
+- prevention of unverified generated URLs.
 
 This architecture reduces unnecessary dependence on the LLM.
+
+A key design principle used throughout the project is:
+
+```text
+If software can compute or validate something reliably,
+the LLM should not be responsible for guessing it.
+```
 
 ---
 
@@ -346,7 +515,55 @@ Uses the previous conversation context when interpreting
 the follow-up question.
 ```
 
-The interface also provides a conversation reset capability.
+Conversation history is stored in Streamlit session state.
+
+The interface also provides a reset capability so that users can start a new conversation.
+
+Conversation memory is session-based rather than permanently stored.
+
+---
+
+## Tool and Capability Design
+
+The application performs useful operations beyond natural-language generation.
+
+Two major capabilities are exposed through controlled application logic.
+
+### CFPB Knowledge Retrieval
+
+The support workflow:
+
+```text
+Question
+  ↓
+Semantic search
+  ↓
+Relevant CFPB evidence
+  ↓
+Grounded response
+```
+
+This capability is used when the user needs guidance derived from official CFPB documents.
+
+### Deterministic Complaint Analytics
+
+The analytics workflow:
+
+```text
+Question
+  ↓
+Intent / metric identification
+  ↓
+Approved Python / Pandas operation
+  ↓
+Computed result
+  ↓
+Natural-language explanation
+```
+
+This capability is used when the user asks for totals, percentages, rankings, monthly comparisons or other supported statistical analyses.
+
+The backend router selects the appropriate path based on the request and conversation context.
 
 ---
 
@@ -357,13 +574,14 @@ A formal evaluation suite was created with **15 test cases** covering:
 - normal consumer-support requests;
 - credit reporting;
 - debt collection;
-- bank account problems;
+- bank-account problems;
 - out-of-domain queries;
 - ambiguous queries;
-- invalid/gibberish inputs;
+- invalid or gibberish inputs;
 - adversarial requests;
 - analytics queries;
-- unsupported calculations; and
+- unsupported calculations;
+- retrieval behaviour; and
 - multi-turn interaction.
 
 Final evaluation results:
@@ -381,6 +599,18 @@ Evaluation files are stored in:
 
 ```text
 evaluation/formal_evaluation/
+```
+
+The evaluation process was iterative.
+
+Observed failures during development included routing edge cases, inconsistent prompt behaviour, weak fallback actions and an unverified generated-link issue.
+
+These were addressed through targeted deterministic safeguards, improved routing logic and clearer application boundaries rather than continually increasing prompt complexity.
+
+The evaluation history is documented in:
+
+```text
+evaluation/formal_evaluation/evaluation_history.md
 ```
 
 ---
@@ -409,10 +639,35 @@ The current test suite contains **12 tests** covering functionality including:
 Latest result:
 
 ```text
-Ran 12 tests
+Ran 12 tests in 0.045s
 
 OK
 ```
+
+---
+
+## Error and Uncertainty Handling
+
+The application includes safeguards for:
+
+- weak retrieval results;
+- insufficient CFPB evidence;
+- ambiguous questions;
+- malformed LLM output;
+- unsupported calculations;
+- out-of-domain questions;
+- adversarial requests;
+- unavailable application services;
+- unexpected request-processing errors; and
+- cases requiring human review.
+
+Request-processing errors are handled in the Streamlit application layer so that users receive a clear error message rather than an unhandled Python traceback.
+
+The main application entry point also provides a top-level failure boundary for startup errors such as unavailable required data.
+
+Application errors are logged to support diagnosis.
+
+The system avoids claiming guaranteed consumer outcomes.
 
 ---
 
@@ -427,28 +682,40 @@ customer-service-ai-clean/
 ├── formal_evaluation.py
 ├── prepare_cfpb_data.py
 ├── build_knowledge_base.py
+├── prompt_experiment.py
+├── prompt_final_experiment.py
+├── prompt_refinement_experiment.py
+│
 ├── requirements.txt
 ├── Dockerfile
 ├── docker-compose.yml
 ├── .dockerignore
 ├── .env.example
+├── .gitattributes
 ├── .gitignore
 │
 ├── data/
 │   ├── documents/
 │   ├── processed/
-│   ├── raw/
-│   └── chroma_db/
+│   ├── raw/             # local only, excluded from Git
+│   └── chroma_db/       # generated locally, excluded from Git
+│
+├── docs/
+│   └── architecture.md
 │
 ├── evaluation/
 │   ├── formal_evaluation/
-│   └── prompt_experiments/
+│   ├── prompt_experiments/
+│   ├── prompt_final/
+│   └── prompt_refinement/
 │
 └── tests/
     └── test_backend.py
 ```
 
 The large raw CFPB dataset and generated ChromaDB files are excluded from Git using `.gitignore`.
+
+The repository retains the source documents, processed analytical files, evaluation evidence and scripts required to understand and reproduce the system.
 
 ---
 
@@ -461,8 +728,6 @@ git clone https://github.com/oheneba-oa/Final_Project.git
 cd Final_Project
 ```
 
----
-
 ### 2. Create or Activate a Python Environment
 
 Python 3.11 is recommended.
@@ -473,8 +738,6 @@ Example using Conda:
 conda create -n customer_service_ai python=3.11
 conda activate customer_service_ai
 ```
-
----
 
 ### 3. Install Dependencies
 
@@ -497,6 +760,8 @@ Check installed models:
 ```bash
 ollama list
 ```
+
+Ollama must be running before the application attempts to use the language model.
 
 ---
 
@@ -523,35 +788,49 @@ HF_TOKEN=
 
 The Hugging Face token is optional.
 
+If supplied, it can be used for authenticated Hugging Face model downloads.
+
+No secrets are stored directly in the source code.
+
 ---
 
 ## Building the Knowledge Base
 
-If the ChromaDB database has not already been generated, ensure the CFPB documents are available in:
+The generated ChromaDB vector database is intentionally excluded from Git.
+
+The CFPB source documents required to rebuild it are included in:
 
 ```text
 data/documents/
 ```
 
-Then run:
+To build the knowledge base manually, run:
 
 ```bash
 python build_knowledge_base.py
 ```
 
-This creates the local vector database in:
+This creates:
 
 ```text
 data/chroma_db/
 ```
 
+and indexes approximately **252 chunks**.
+
 ---
 
 ## Preparing CFPB Structured Data
 
-The original CFPB CSV is intentionally excluded from the repository because of its size.
+The original multi-gigabyte CFPB CSV is intentionally excluded from the repository because of its size.
 
-To rebuild the structured data, place the original file at:
+The processed analytical outputs required by the application are included in:
+
+```text
+data/processed/
+```
+
+To reproduce these files from the original CFPB complaint export, place the raw file at:
 
 ```text
 data/raw/complaints.csv
@@ -593,13 +872,19 @@ in a browser.
 
 ## Running the Tests
 
+Run:
+
 ```bash
 python -m unittest discover -s tests -v
 ```
 
+The current suite contains 12 backend tests.
+
 ---
 
 ## Running the Formal Evaluation
+
+Run:
 
 ```bash
 python formal_evaluation.py
@@ -611,19 +896,21 @@ Evaluation outputs are saved in:
 evaluation/formal_evaluation/
 ```
 
+The final validated evaluation contains 15 cases.
+
 ---
 
 ## Docker Deployment
 
 The application has been successfully built and tested using Docker Desktop.
 
+The Docker image uses CPU-only PyTorch to avoid unnecessary CUDA and NVIDIA dependencies.
+
 ### Build the Docker Image
 
 ```bash
 docker compose build
 ```
-
-The Docker image uses CPU-only PyTorch to avoid unnecessary CUDA and NVIDIA dependencies.
 
 ### Start the Application
 
@@ -641,11 +928,49 @@ Open:
 http://localhost:8501
 ```
 
-The Docker container connects to the host Ollama service using:
+The container connects to the host Ollama service using:
 
 ```text
 host.docker.internal
 ```
+
+### Automatic Knowledge-Base Creation
+
+The generated Chroma database does not need to be committed to the repository.
+
+When the application container starts, it checks whether:
+
+```text
+data/chroma_db/chroma.sqlite3
+```
+
+exists.
+
+If the database is missing, Docker automatically runs:
+
+```bash
+python build_knowledge_base.py
+```
+
+before starting Streamlit.
+
+This behaviour was tested using a fresh Docker image with no existing Chroma database.
+
+During the test, the container:
+
+```text
+Detected missing knowledge base
+        ↓
+Loaded the embedding model
+        ↓
+Processed all six CFPB documents
+        ↓
+Created 252 ChromaDB chunks
+        ↓
+Started the Streamlit application
+```
+
+This allows a fresh clone to rebuild the retrieval layer from the source documents included in the repository.
 
 ### Stop the Application
 
@@ -682,26 +1007,33 @@ Windows Host
         └── Processed CFPB Data
 ```
 
-The model is not packaged inside the application image.
+The language model is not packaged inside the application image.
 
-This keeps the project simpler and avoids unnecessarily large Docker images.
+Instead, the container communicates with the locally running Ollama service on the host.
+
+This keeps the project architecture simpler and avoids unnecessarily large Docker images.
 
 ---
 
-## Error and Uncertainty Handling
+## Architecture Documentation
 
-The application includes safeguards for:
+A more detailed engineering description is available in:
 
-- weak retrieval results;
-- insufficient CFPB evidence;
-- ambiguous questions;
-- malformed LLM output;
-- unsupported calculations;
-- out-of-domain questions;
-- adversarial requests; and
-- cases requiring human review.
+```text
+docs/architecture.md
+```
 
-The application avoids claiming guaranteed consumer outcomes.
+It documents:
+
+- system components;
+- request routing;
+- RAG processing;
+- structured-data analysis;
+- application state;
+- error handling;
+- external services;
+- persistence; and
+- engineering rationale.
 
 ---
 
@@ -711,17 +1043,21 @@ The current system has several limitations.
 
 1. It uses a local Llama 3.2 model whose output can vary between runs.
 
-2. The knowledge base only covers the CFPB documents included in the project.
+2. The knowledge base is limited to the CFPB documents included in the project.
 
-3. The system does not provide legal advice.
+3. The system does not provide legal, financial or regulatory advice.
 
-4. Complaint statistics currently focus primarily on the processed 2025 dataset.
+4. Complaint statistics currently focus on the processed 2025 dataset.
 
 5. The application depends on a locally available Ollama service.
 
-6. Retrieval performance depends on the quality and coverage of the indexed CFPB documents.
+6. Retrieval quality depends on the coverage and relevance of the indexed CFPB documents.
 
-7. Some safety and reliability behaviours require deterministic rules because prompt instructions alone are not always consistently followed by the model.
+7. Some safety and reliability behaviours require deterministic rules because prompt instructions alone are not always followed consistently by the model.
+
+8. Conversation history is session-based and is not permanently stored between sessions.
+
+9. The current application does not submit complaints to the CFPB or communicate directly with financial institutions.
 
 ---
 
@@ -734,11 +1070,12 @@ Future versions could include:
 - automatic updating of CFPB complaint data;
 - improved retrieval reranking;
 - additional financial-product classifications;
-- cloud-hosted language models;
+- cloud-hosted language-model options;
 - persistent user sessions;
 - database-backed conversation storage;
-- richer visual analytics dashboards; and
-- automated monitoring of model and retrieval performance.
+- richer visual analytics dashboards;
+- automated monitoring of model and retrieval performance; and
+- carefully controlled integrations with external complaint-management systems.
 
 ---
 
@@ -754,6 +1091,40 @@ It should not be used as a replacement for:
 - official CFPB guidance.
 
 When evidence is incomplete or confidence is low, the application is designed to indicate uncertainty and recommend human review.
+
+The application is therefore best understood as a tool for **finding, organizing, analysing and explaining information**, not as an autonomous decision-maker.
+
+---
+
+## Executive Summary
+
+From a business perspective, the project demonstrates how AI can be combined with deterministic software to make a large public consumer-finance information environment easier to use.
+
+The system does not simply generate answers.
+
+It performs two controlled functions:
+
+```text
+Understand a consumer-finance problem
+        ↓
+Find relevant official guidance
+        ↓
+Explain a practical next step
+```
+
+and:
+
+```text
+Understand a data question
+        ↓
+Calculate the answer from structured CFPB data
+        ↓
+Explain the result clearly
+```
+
+The value of the system lies in reducing the effort required to move from a user's question to either relevant official information or a reliable analytical result.
+
+Its design also demonstrates an important engineering principle: AI is most useful when it is combined with retrieval, deterministic computation, validation and clear human oversight rather than being treated as a replacement for all other software.
 
 ---
 

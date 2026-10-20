@@ -1,6 +1,7 @@
 import logging
 from pathlib import Path
 
+import streamlit as st
 from dotenv import load_dotenv
 
 
@@ -34,7 +35,8 @@ logger = logging.getLogger(
 )
 
 
-# Import after environment variables are loaded.
+# Environment variables are loaded before importing the
+# application so dependent libraries can read them correctly.
 from streamlit_app import run_app
 
 
@@ -49,9 +51,25 @@ def main():
         "Intelligence Assistant."
     )
 
-    run_app()
+    try:
+
+        run_app()
+
+    except Exception:
+
+        logger.exception(
+            "Application startup failed."
+        )
+
+        st.error(
+            "The application could not be started. "
+            "Check that the required CFPB data files "
+            "are available and that the configured "
+            "services are running."
+        )
+
+        st.stop()
 
 
 if __name__ == "__main__":
-
     main()
