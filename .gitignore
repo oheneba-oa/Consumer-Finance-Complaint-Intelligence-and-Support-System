@@ -4,6 +4,9 @@ data/raw/
 # Local Chroma vector database
 data/chroma_db/
 
+# Synthetic / demo data
+data/demo/
+
 # Python cache
 __pycache__/
 *.py[cod]
